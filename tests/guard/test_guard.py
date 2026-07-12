@@ -1,6 +1,7 @@
 """Guard plugin: dispatch, safechain and preflight tools, hooks.json shell wrappers."""
 
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -33,8 +34,9 @@ def run_guard(
     event: dict | None = None,
     allow_unscanned: bool = False,
     path: str | None = None,
+    jig_home: str | Path = "/nonexistent",
 ) -> dict | None:
-    env = base_env(jig_home="/nonexistent")
+    env = base_env(jig_home=jig_home)
     env["JIG_GUARD_SHIMS_DIR"] = str(shims_dir)
     if path is not None:
         env["PATH"] = path
@@ -69,76 +71,107 @@ def run_wrapper(*, command: str, jig_home: str | Path, event: dict) -> dict | No
 
 
 @pytest.fixture
-def shims(tmp_path: Path) -> Path:
+def shims(*, tmp_path: Path) -> Path:
     path = tmp_path / "shims"
     path.mkdir()
     return path
 
 
 @pytest.fixture
-def missing(tmp_path: Path) -> Path:
+def missing(*, tmp_path: Path) -> Path:
     return tmp_path / "absent"
 
 
 @pytest.mark.parametrize("command", ["git status", "npm test", "uv run pytest"])
-def test_non_install_commands_pass(shims: Path, command: str) -> None:
+def test_non_install_commands_pass(*, shims: Path, command: str) -> None:
     assert run_guard(shims_dir=shims, command=command) is None
 
 
-def test_install_denied_with_shimmed_rerun_line(shims: Path) -> None:
+def test_install_denied_with_shimmed_rerun_line(*, shims: Path) -> None:
     out = run_guard(shims_dir=shims, command="npm install left-pad")
     assert out["permissionDecision"] == "deny"
     assert f'export PATH="{shims}:$PATH"; npm install left-pad' in out["permissionDecisionReason"]
 
 
-def test_reissued_command_passes(shims: Path) -> None:
+def test_reissued_command_passes(*, shims: Path) -> None:
     command = f'export PATH="{shims}:$PATH"; npm install left-pad'
     assert run_guard(shims_dir=shims, command=command) is None
 
 
-def test_path_already_carrying_shims_passes(shims: Path) -> None:
+def test_path_already_carrying_shims_passes(*, shims: Path) -> None:
     assert run_guard(shims_dir=shims, command="npm install left-pad", path=f"{shims}:/usr/bin") is None
 
 
-def test_optout_does_not_skip_the_scan(shims: Path) -> None:
+def test_optout_does_not_skip_the_scan(*, shims: Path) -> None:
     assert run_guard(shims_dir=shims, command="npm install left-pad", allow_unscanned=True) is not None
 
 
 @pytest.mark.parametrize("command", ["pip install requests", "uvx ruff check"])
-def test_unscannable_install_denied_with_pointer(missing: Path, command: str) -> None:
+def test_unscannable_install_denied_with_pointer(*, missing: Path, command: str) -> None:
     out = run_guard(shims_dir=missing, command=command)
     assert out["permissionDecision"] == "deny"
     assert "safe-chain" in out["permissionDecisionReason"]
 
 
-def test_optout_allows_unscanned_install(missing: Path) -> None:
+def test_optout_allows_unscanned_install(*, missing: Path) -> None:
     assert run_guard(shims_dir=missing, command="pip install requests", allow_unscanned=True) is None
 
 
-def test_non_matching_event_skips_enforcement(missing: Path) -> None:
+def test_non_matching_event_skips_enforcement(*, missing: Path) -> None:
     event = {"hook_event_name": "PostToolUse", "tool_input": {"command": "npm install x"}}
     assert run_guard(shims_dir=missing, event=event) is None
 
 
-def test_preflight_silent_when_shims_exist(shims: Path) -> None:
+def test_preflight_silent_when_shims_exist(*, shims: Path) -> None:
     assert run_guard(shims_dir=shims, args=("preflight",), event=SESSION_EVENT) is None
 
 
-def test_preflight_warns_when_safechain_missing(missing: Path) -> None:
+def test_preflight_warns_when_safechain_missing(*, missing: Path) -> None:
     out = run_guard(shims_dir=missing, args=("preflight",), event=SESSION_EVENT)
     assert "safe-chain" in out["additionalContext"]
     assert out["hookEventName"] == "SessionStart"
 
 
-def test_preflight_silent_after_optout(missing: Path) -> None:
+def test_preflight_silent_after_optout(*, missing: Path) -> None:
     assert run_guard(shims_dir=missing, args=("preflight",), event=SESSION_EVENT, allow_unscanned=True) is None
 
 
-def test_event_routing_reaches_preflight_without_arg(missing: Path) -> None:
+def test_event_routing_reaches_preflight_without_arg(*, missing: Path) -> None:
     assert run_guard(shims_dir=missing, event=SESSION_EVENT) is not None
 
 
-def test_direct_tool_selection(missing: Path) -> None:
+RUNTIME_PIN = re.search(
+    r'^PYTHON_VERSION="([^"]+)"$', (PLUGIN_ROOT / "scripts" / "setup.sh").read_text(), re.MULTILINE
+).group(1)
+
+
+@pytest.fixture
+def stamped_home(*, tmp_path: Path) -> Path:
+    home = tmp_path / "home"
+    home.mkdir()
+    (home / ".python-pin").write_text(f"{RUNTIME_PIN}\n")
+    return home
+
+
+def test_preflight_silent_when_stamp_matches_pin(*, shims: Path, stamped_home: Path) -> None:
+    assert run_guard(shims_dir=shims, args=("preflight",), event=SESSION_EVENT, jig_home=stamped_home) is None
+
+
+def test_preflight_nudges_setup_rerun_on_stale_runtime(*, shims: Path, stamped_home: Path) -> None:
+    (stamped_home / ".python-pin").write_text("0.0.0\n")
+    out = run_guard(shims_dir=shims, args=("preflight",), event=SESSION_EVENT, jig_home=stamped_home)
+    assert "re-run" in out["additionalContext"]
+    assert "setup.sh" in out["additionalContext"]
+
+
+def test_preflight_combines_runtime_and_safechain_warnings(*, missing: Path, stamped_home: Path) -> None:
+    (stamped_home / ".python-pin").write_text("0.0.0\n")
+    out = run_guard(shims_dir=missing, args=("preflight",), event=SESSION_EVENT, jig_home=stamped_home)
+    assert "setup.sh" in out["additionalContext"]
+    assert "safe-chain" in out["additionalContext"]
+
+
+def test_direct_tool_selection(*, missing: Path) -> None:
     assert run_guard(shims_dir=missing, command="pip install requests", args=("safechain",)) is not None
 
 
@@ -165,19 +198,19 @@ def test_pretool_wrapper_silent_without_runtime() -> None:
 
 
 @pytest.fixture
-def jighome(tmp_path: Path) -> Path:
+def jighome(*, tmp_path: Path) -> Path:
     home = tmp_path / "jighome"
     (home / "bin").mkdir(parents=True)
     (home / "bin" / "python3").symlink_to(sys.executable)
     return home
 
 
-def test_session_wrapper_execs_preflight(jighome: Path) -> None:
+def test_session_wrapper_execs_preflight(*, jighome: Path) -> None:
     out = run_wrapper(command=SESSION_CMD, jig_home=jighome, event=SESSION_EVENT)
     assert "safe-chain" in out["additionalContext"]  # HOME=/nonexistent has no shims
 
 
-def test_pretool_wrapper_execs_enforcement(jighome: Path) -> None:
+def test_pretool_wrapper_execs_enforcement(*, jighome: Path) -> None:
     event = {"hook_event_name": "PreToolUse", "tool_name": "Bash", "tool_input": {"command": "npm install x"}}
     out = run_wrapper(command=PRETOOL_CMD, jig_home=jighome, event=event)
     assert out["permissionDecision"] == "deny"

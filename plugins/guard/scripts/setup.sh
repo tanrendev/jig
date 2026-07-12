@@ -42,3 +42,7 @@ ln -sf "$py" "$JIG_HOME/bin/python3"
 "$JIG_HOME/bin/python3" -c "import sys
 assert sys.version.startswith('$PYTHON_VERSION'), sys.version
 print('jig runtime ok:', sys.version.split()[0], 'at', sys.executable)"
+
+# Stamp what was provisioned: preflight compares this against the pin a
+# plugin update ships and nudges a setup.sh re-run when they diverge.
+printf '%s\n' "$PYTHON_VERSION" >"$JIG_HOME/.python-pin"
