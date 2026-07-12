@@ -2,8 +2,10 @@
 
 Plugin marketplace for Claude Code. One plugin:
 
-- **guard**: blocks destructive shell commands (rm -rf on roots and globs,
-  force pushes, hard resets) in a PreToolUse hook before they run.
+- **guard**: PreToolUse guardrails. Today: routes agent-driven package
+  installs through the Aikido safe-chain malware scan and blocks installs
+  that can't be scanned. Next: deny-list for destructive shell commands
+  (rm -rf on roots and globs, force pushes, hard resets).
 
 ## Install
 
@@ -11,6 +13,17 @@ Plugin marketplace for Claude Code. One plugin:
 /plugin marketplace add tanrendev/jig
 /plugin install guard@jig
 ```
+
+The hooks run on a jig-managed Python runtime. Provision it once
+(and re-run after a version-pin bump) from the installed plugin directory:
+
+```
+sh scripts/setup.sh
+```
+
+This pins uv and CPython under `~/.local/share/jig` (override with
+`JIG_HOME`); nothing else on the machine is read or modified. Until it runs,
+guard stays inactive and prints a notice instead of blocking anything.
 
 ## Repository layout
 

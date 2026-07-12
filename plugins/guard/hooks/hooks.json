@@ -1,0 +1,28 @@
+{
+  "description": "guard: SessionStart preflight (managed runtime and safe-chain diagnostics) plus PreToolUse enforcement (package installs must pass the safe-chain scan).",
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh -c 'PY=\"${JIG_HOME:-$HOME/.local/share/jig}/bin/python3\"; if [ -x \"$PY\" ]; then exec \"$PY\" \"$1\" preflight; fi; printf %s \"{\\\"hookSpecificOutput\\\":{\\\"hookEventName\\\":\\\"SessionStart\\\",\\\"additionalContext\\\":\\\"guard inactive: managed Python runtime missing. Tell the user to run scripts/setup.sh from the guard plugin directory.\\\"}}\"' jig-guard \"${CLAUDE_PLUGIN_ROOT}/scripts/guard.py\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh -c 'PY=\"${JIG_HOME:-$HOME/.local/share/jig}/bin/python3\"; if [ -x \"$PY\" ]; then exec \"$PY\" \"$1\"; fi' jig-guard \"${CLAUDE_PLUGIN_ROOT}/scripts/guard.py\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}
