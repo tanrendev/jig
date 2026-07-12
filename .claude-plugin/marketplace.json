@@ -1,0 +1,13 @@
+{
+  "name": "jig",
+  "owner": { "name": "tanren", "email": "hello@tanren.dev" },
+  "description": "Guardrail hooks for Claude Code.",
+  "plugins": [
+    {
+      "name": "guard",
+      "source": "./plugins/guard",
+      "description": "Blocks destructive shell commands before they run: deny-list checked in a PreToolUse hook.",
+      "category": "security"
+    }
+  ]
+}
