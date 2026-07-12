@@ -1,0 +1,98 @@
+[project]
+name = "jig"
+version = "0.1.0"
+description = "Plugin marketplace for Claude Code"
+readme = "README.md"
+requires-python = ">=3.15"
+dependencies = []
+
+[dependency-groups]
+dev = [
+    "commitizen==4.16.4",
+    "prek==0.4.8",
+    "ruff==0.15.21",
+    "ty==0.0.58",
+    "zizmor==1.26.1",
+]
+
+[tool.uv]
+default-groups = []
+package = false
+required-version = "==0.11.28"
+
+[tool.commitizen]
+name = "cz_conventional_commits"
+
+[tool.ruff]
+target-version = "py315"
+line-length = 120
+preview = false
+
+[tool.ruff.lint]
+select = [
+    "ALL",  # Enable every stable Ruff rule.
+]
+ignore = [
+    # Frameworks and data-science ecosystems this project does not use.
+    "AIR",   # Airflow rules
+    "DJ",    # flake8-django rules
+    "FAST",  # FastAPI rules
+    "NPY",   # NumPy-specific rules
+    "PD",    # pandas-vet rules
+
+    # The project does not require copyright headers in every Python file.
+    "CPY",  # flake8-copyright rules
+
+    # Docstrings stay optional; write them where they add information.
+    "D1",  # undocumented-node rules
+
+    # Rules that conflict with Ruff's formatter or with each other.
+    "COM812",  # missing-trailing-comma
+    "COM819",  # prohibited-trailing-comma
+    "D206",    # docstring-tab-indentation
+    "D300",    # triple-single-quotes
+    "E111",    # indentation-with-invalid-multiple
+    "E114",    # indentation-with-invalid-multiple-comment
+    "E117",    # over-indented
+    "Q000",    # bad-quotes-inline-string
+    "Q001",    # bad-quotes-multiline-string
+    "Q002",    # bad-quotes-docstring
+    "Q003",    # avoidable-escaped-quote
+    "Q004",    # unnecessary-escaped-quote
+    "W191",    # tab-indentation
+]
+
+[tool.ruff.lint.per-file-ignores]
+"**/tests/**/*.py" = [
+    "PT",       # pytest-style rules — the test suite standardizes on unittest.
+    "S101",     # assert — allow plain assertions in tests.
+    "INP001",   # test dirs are not packages.
+    "S603",     # subprocess with inputs the tests themselves construct.
+    "PLR0913",  # helpers mirror the hook env knobs; the count is the point.
+]
+"plugins/*/scripts/*.py" = [
+    "INP001",  # hook scripts are standalone files on sys.path, not a package.
+]
+
+[tool.ruff.lint.pydocstyle]
+convention = "pep257"
+
+[tool.ruff.lint.isort]
+combine-as-imports = true
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "lf"
+preview = false
+
+[tool.ty.environment]
+python-version = "3.15"
+
+[tool.ty.src]
+include = [
+    "plugins",
+]
+
+[tool.ty.terminal]
+error-on-warning = true

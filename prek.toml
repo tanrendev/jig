@@ -1,0 +1,27 @@
+#:schema https://www.schemastore.org/prek.json
+
+default_install_hook_types = ["pre-commit", "commit-msg", "pre-push"]
+
+[[repos]]
+repo = "local"
+hooks = [
+    { id = "ruff-check", name = "ruff check", entry = "uv run --locked --group dev ruff check --fix", language = "system", types_or = ["python", "pyi"], require_serial = true },
+    { id = "ruff-format", name = "ruff format", entry = "uv run --locked --group dev ruff format", language = "system", types_or = ["python", "pyi"], require_serial = true },
+    { id = "ty", name = "ty check", entry = "uv run --locked --group dev ty check", language = "system", pass_filenames = false, always_run = true, require_serial = true },
+    { id = "commitizen", name = "commitizen check", entry = "uv run --locked --group dev cz check --allow-abort --commit-msg-file", language = "system", stages = ["commit-msg"] },
+    { id = "zizmor", name = "zizmor", entry = "uv run --locked --group dev zizmor", language = "system", files = "^\\.github/workflows/.*\\.ya?ml$" },
+]
+
+[[repos]]
+repo = "builtin"
+hooks = [
+    { id = "trailing-whitespace" },
+    { id = "end-of-file-fixer" },
+    { id = "check-json" },
+    { id = "check-toml" },
+    { id = "check-yaml" },
+    { id = "check-merge-conflict" },
+    { id = "check-case-conflict" },
+    { id = "detect-private-key" },
+    { id = "check-added-large-files", args = ["--maxkb=500"] },
+]
