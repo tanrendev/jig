@@ -59,13 +59,17 @@ def run_guard(
     return json.loads(out)["hookSpecificOutput"] if out else None
 
 
-def run_wrapper(*, command: str, jig_home: str | Path, event: dict) -> dict | None:
+def run_wrapper(
+    *, command: str, jig_home: str | Path, event: dict, plugin_root: str | Path = PLUGIN_ROOT
+) -> dict | None:
+    env = base_env(jig_home=jig_home)
+    env["CLAUDE_PLUGIN_ROOT"] = str(plugin_root)
     proc = subprocess.run(
         ["/bin/sh", "-c", command],
         input=json.dumps(event),
         capture_output=True,
         text=True,
-        env=base_env(jig_home=jig_home),
+        env=env,
         check=False,
     )
     assert proc.returncode == 0, proc.stderr
@@ -224,15 +228,27 @@ def test_malformed_stdin_stays_silent() -> None:
     assert proc.stdout == ""
 
 
-def test_session_wrapper_reports_missing_runtime() -> None:
-    out = run_wrapper(command=SESSION_CMD, jig_home="/nonexistent", event=SESSION_EVENT)
-    assert out["hookEventName"] == "SessionStart"
-    assert "setup.sh" in out["additionalContext"]
+# A plugin tree the SessionStart wrapper can drive with a setup.sh we control,
+# so the auto-provision branch never touches the network. setup.sh is derived
+# by the wrapper as dirname(guard.py)/setup.sh, hence the per-test rewrite.
+PROVISION_OK = (
+    'mkdir -p "${JIG_HOME}/bin"\n'
+    f'ln -sf "{sys.executable}" "${{JIG_HOME}}/bin/python3"\n'
+    f'printf "%s\\n" "{RUNTIME_PIN}" > "${{JIG_HOME}}/.python-pin"'
+)
 
 
-def test_pretool_wrapper_silent_without_runtime() -> None:
-    event = {"tool_input": {"command": "npm install x"}}
-    assert run_wrapper(command=PRETOOL_CMD, jig_home="/nonexistent", event=event) is None
+def write_setup(plugin_root: Path, *, body: str) -> None:
+    (plugin_root / "scripts" / "setup.sh").write_text("#!/bin/sh\n" + body + "\n")
+
+
+@pytest.fixture
+def fake_plugin(*, tmp_path: Path) -> Path:
+    root = tmp_path / "plugin"
+    (root / "scripts").mkdir(parents=True)
+    for mod in ("guard.py", "safechain.py", "preflight.py"):
+        (root / "scripts" / mod).symlink_to(PLUGIN_ROOT / "scripts" / mod)
+    return root
 
 
 @pytest.fixture
@@ -241,6 +257,34 @@ def jighome(*, tmp_path: Path) -> Path:
     (home / "bin").mkdir(parents=True)
     (home / "bin" / "python3").symlink_to(sys.executable)
     return home
+
+
+def test_session_wrapper_provisions_missing_runtime(*, fake_plugin: Path, tmp_path: Path) -> None:
+    jig = tmp_path / "fresh"  # no interpreter yet
+    write_setup(fake_plugin, body=PROVISION_OK)
+    out = run_wrapper(command=SESSION_CMD, jig_home=jig, event=SESSION_EVENT, plugin_root=fake_plugin)
+    assert (jig / "bin" / "python3").exists()  # wrapper ran setup.sh
+    assert "safe-chain" in out["additionalContext"]  # then execed preflight
+
+
+def test_session_wrapper_reports_when_provisioning_fails(*, fake_plugin: Path, tmp_path: Path) -> None:
+    jig = tmp_path / "fresh"
+    write_setup(fake_plugin, body="exit 1")
+    out = run_wrapper(command=SESSION_CMD, jig_home=jig, event=SESSION_EVENT, plugin_root=fake_plugin)
+    assert not (jig / "bin" / "python3").exists()
+    assert "could not provision" in out["additionalContext"]
+
+
+def test_session_wrapper_skips_provision_when_present(*, fake_plugin: Path, jighome: Path) -> None:
+    write_setup(fake_plugin, body='touch "${JIG_HOME}/SENTINEL"')
+    run_wrapper(command=SESSION_CMD, jig_home=jighome, event=SESSION_EVENT, plugin_root=fake_plugin)
+    assert not (jighome / "SENTINEL").exists()  # runtime present, no provisioning attempt
+
+
+def test_pretool_wrapper_silent_without_runtime() -> None:
+    # PreToolUse never provisions (a tool call must not block on a download).
+    event = {"tool_input": {"command": "npm install x"}}
+    assert run_wrapper(command=PRETOOL_CMD, jig_home="/nonexistent", event=event) is None
 
 
 def test_session_wrapper_execs_preflight(*, jighome: Path) -> None:
