@@ -35,6 +35,7 @@ def run_guard(
     allow_unscanned: bool = False,
     path: str | None = None,
     jig_home: str | Path = "/nonexistent",
+    env_file: str | Path | None = None,
 ) -> dict | None:
     env = base_env(jig_home=jig_home)
     env["JIG_GUARD_SHIMS_DIR"] = str(shims_dir)
@@ -42,6 +43,8 @@ def run_guard(
         env["PATH"] = path
     if allow_unscanned:
         env["JIG_GUARD_ALLOW_UNSCANNED"] = "1"
+    if env_file is not None:
+        env["CLAUDE_ENV_FILE"] = str(env_file)
     if event is None:
         event = {"hook_event_name": "PreToolUse", "tool_name": "Bash", "tool_input": {"command": command}}
     proc = subprocess.run(
@@ -169,6 +172,41 @@ def test_preflight_combines_runtime_and_safechain_warnings(*, missing: Path, sta
     out = run_guard(shims_dir=missing, args=("preflight",), event=SESSION_EVENT, jig_home=stamped_home)
     assert "setup.sh" in out["additionalContext"]
     assert "safe-chain" in out["additionalContext"]
+
+
+def test_pathwire_prepends_shims_to_env_file(*, shims: Path, tmp_path: Path) -> None:
+    env_file = tmp_path / "session-env.sh"
+    run_guard(shims_dir=shims, args=("preflight",), event=SESSION_EVENT, env_file=env_file)
+    assert env_file.read_text().strip() == f'export PATH="{shims}:$PATH"'
+
+
+def test_pathwire_silent_without_env_file(*, shims: Path) -> None:
+    # No CLAUDE_ENV_FILE (non-Claude host or older version): nothing to write, no error.
+    assert run_guard(shims_dir=shims, args=("preflight",), event=SESSION_EVENT) is None
+
+
+def test_pathwire_skips_when_shims_absent(*, missing: Path, tmp_path: Path) -> None:
+    env_file = tmp_path / "session-env.sh"
+    env_file.touch()
+    run_guard(shims_dir=missing, args=("preflight",), event=SESSION_EVENT, env_file=env_file)
+    assert env_file.read_text() == ""
+
+
+def test_pathwire_is_idempotent(*, shims: Path, tmp_path: Path) -> None:
+    env_file = tmp_path / "session-env.sh"
+    for _ in range(2):
+        run_guard(shims_dir=shims, args=("preflight",), event=SESSION_EVENT, env_file=env_file)
+    assert env_file.read_text().count("export PATH") == 1
+
+
+def test_pathwire_runs_even_when_preflight_warns(*, shims: Path, stamped_home: Path, tmp_path: Path) -> None:
+    # Side effect (wire) and output (warning) must both happen: a stale pin warns
+    # while shims exist to wire. Guards against the dispatcher's first-output-returns.
+    (stamped_home / ".python-pin").write_text("0.0.0\n")
+    env_file = tmp_path / "session-env.sh"
+    out = run_guard(shims_dir=shims, args=("preflight",), event=SESSION_EVENT, jig_home=stamped_home, env_file=env_file)
+    assert "re-run" in out["additionalContext"]
+    assert f'export PATH="{shims}:$PATH"' in env_file.read_text()
 
 
 def test_direct_tool_selection(*, missing: Path) -> None:
