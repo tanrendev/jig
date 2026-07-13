@@ -26,11 +26,9 @@ PIN_LINE = re.compile(r'^PYTHON_VERSION="([^"]+)"$', re.MULTILINE)
 SAFECHAIN_WARNING = (
     "guard: Aikido safe-chain is not installed on this machine, so "
     "agent-driven package installs will be denied rather than run "
-    "unscanned. Tell the user early if installs are likely in this "
-    "session: they can install safe-chain from "
-    "https://github.com/AikidoSec/safe-chain (installer with --ci so PATH "
-    "shims exist) or set JIG_GUARD_ALLOW_UNSCANNED=1 to accept unscanned "
-    "installs."
+    "unscanned. If installs are likely this session, tell the user they can "
+    "run /guard:setup to install it, or set JIG_GUARD_ALLOW_UNSCANNED=1 to "
+    "accept unscanned installs."
 )
 
 

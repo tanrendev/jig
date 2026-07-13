@@ -69,6 +69,7 @@ ignore = [
     "INP001",   # test dirs are not packages.
     "S603",     # subprocess with inputs the tests themselves construct.
     "PLR0913",  # helpers mirror the hook env knobs; the count is the point.
+    "PLR2004",  # expected exit codes and counts are literal in tests.
 ]
 "plugins/*/scripts/*.py" = [
     "INP001",  # hook scripts are standalone files on sys.path, not a package.

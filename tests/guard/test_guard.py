@@ -287,6 +287,14 @@ def test_pretool_wrapper_silent_without_runtime() -> None:
     assert run_wrapper(command=PRETOOL_CMD, jig_home="/nonexistent", event=event) is None
 
 
+def test_setup_rejects_unknown_option() -> None:
+    # Arg parsing precedes provisioning, so this exits before any network call.
+    setup = PLUGIN_ROOT / "scripts" / "setup.sh"
+    proc = subprocess.run(["/bin/sh", str(setup), "--bogus"], capture_output=True, text=True, check=False)
+    assert proc.returncode == 2
+    assert "unknown option" in proc.stderr
+
+
 def test_session_wrapper_execs_preflight(*, jighome: Path) -> None:
     out = run_wrapper(command=SESSION_CMD, jig_home=jighome, event=SESSION_EVENT)
     assert "safe-chain" in out["additionalContext"]  # HOME=/nonexistent has no shims

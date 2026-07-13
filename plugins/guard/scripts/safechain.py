@@ -45,10 +45,9 @@ INSTALLS = re.compile(
 
 DENY_MISSING = (
     "Package install blocked: Aikido safe-chain is not installed, so this "
-    "install cannot be scanned for known-malicious packages. Ask the user to "
-    "install it from https://github.com/AikidoSec/safe-chain (run the "
-    "installer with --ci so PATH shims exist), or set "
-    "JIG_GUARD_ALLOW_UNSCANNED=1 to permit unscanned installs."
+    "install cannot be scanned for known-malicious packages. Run /guard:setup "
+    "to install it, or set JIG_GUARD_ALLOW_UNSCANNED=1 to permit unscanned "
+    "installs."
 )
 
 
