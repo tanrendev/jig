@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-PLUGIN_ROOT = Path(__file__).resolve().parents[2] / "plugins" / "guard"
+PLUGIN_ROOT = Path(__file__).resolve().parents[2] / "plugins" / "jig"
 GUARD = PLUGIN_ROOT / "scripts" / "guard.py"
 HOOKS = json.loads((PLUGIN_ROOT / "hooks" / "hooks.json").read_text())
 SESSION_CMD = HOOKS["hooks"]["SessionStart"][0]["hooks"][0]["command"]

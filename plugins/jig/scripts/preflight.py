@@ -27,7 +27,7 @@ SAFECHAIN_WARNING = (
     "guard: Aikido safe-chain is not installed on this machine, so "
     "agent-driven package installs will be denied rather than run "
     "unscanned. If installs are likely this session, tell the user they can "
-    "run /guard:setup to install it, or set JIG_GUARD_ALLOW_UNSCANNED=1 to "
+    "run /jig:setup to install it, or set JIG_GUARD_ALLOW_UNSCANNED=1 to "
     "accept unscanned installs."
 )
 
@@ -71,7 +71,7 @@ def runtime_warning() -> str | None:
     return (
         f"guard: the managed runtime is Python {provisioned} but this "
         f"plugin version pins {pin.group(1)}. Tell the user to re-run "
-        "scripts/setup.sh from the guard plugin to update it."
+        "scripts/setup.sh from the jig plugin to update it."
     )
 
 

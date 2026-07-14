@@ -19,5 +19,5 @@ jobs:
       - run: uv sync --locked --group dev
       # Provisions the managed runtime from nothing, exactly as a plugin
       # user would: catches a broken pin, installer URL, or shim path.
-      - run: sh plugins/guard/scripts/setup.sh
+      - run: sh plugins/jig/scripts/setup.sh
       - run: uv run pytest

@@ -5,8 +5,8 @@
 # pinned below and a hook bug report never starts at "which python is that
 # machine on". Idempotent; re-run after a pin bump.
 #
-# The pins are the single source of the runtime version for all jig
-# plugins. Installer env vars per
+# The pins are the single source of the runtime version for the jig
+# plugin. Installer env vars per
 # https://docs.astral.sh/uv/reference/installer/
 set -eu
 
@@ -57,7 +57,7 @@ print('jig runtime ok:', sys.version.split()[0], 'at', sys.executable)"
 printf '%s\n' "$PYTHON_VERSION" >"$JIG_HOME/.python-pin"
 
 # safe-chain is the scanner guard routes installs through. Opt-in via
-# --with-safechain, driven by the /guard:setup skill so the user sees and
+# --with-safechain, driven by the /jig:setup skill so the user sees and
 # approves this third-party install. Its --ci mode writes PATH shims to
 # ~/.safe-chain/shims, which the SessionStart hook prepends onto PATH.
 if [ "$with_safechain" = 1 ]; then
