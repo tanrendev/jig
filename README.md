@@ -1,6 +1,6 @@
 # jig
 
-Plugin marketplace for Claude Code. One plugin:
+Guardrail hooks for Claude Code, packaged as one plugin. Features:
 
 - **guard**: PreToolUse guardrails. Today: routes agent-driven package
   installs through the Aikido safe-chain malware scan and blocks installs
@@ -11,7 +11,7 @@ Plugin marketplace for Claude Code. One plugin:
 
 ```
 /plugin marketplace add tanrendev/jig
-/plugin install guard@jig
+/plugin install jig@jig
 ```
 
 The hooks run on a jig-managed Python runtime. Provision it once
@@ -29,5 +29,5 @@ guard stays inactive and prints a notice instead of blocking anything.
 
 ```
 .claude-plugin/marketplace.json    catalog read by Claude Code
-plugins/<name>/                    one directory per plugin
+plugins/jig/                       the plugin: commands, hooks, scripts
 ```
