@@ -1,0 +1,110 @@
+# yaml-language-server: $schema=https://storage.googleapis.com/coderabbit_public_assets/schema.v2.json
+# Solo repo: CodeRabbit is the only reviewer. Ruff (ALL rules), ty, and
+# zizmor already gate style, types, and workflow security in the prek
+# hooks, so the review is pointed at what they cannot see: logic, edge
+# cases, security, and design.
+
+language: "en-US"
+
+tone_instructions: >-
+  Comment only on correctness, edge cases, security, and design. Never
+  comment on formatting, import order, naming style, or anything a
+  linter enforces. Plain factual sentences. No praise, no emoji.
+
+reviews:
+  profile: assertive
+  # Formally request changes and only approve once comments are resolved;
+  # with no human reviewer, this is the only gate that blocks a merge.
+  request_changes_workflow: true
+  commit_status: true
+  # A review that could not run should show red, not silently pass.
+  fail_commit_status: true
+  high_level_summary: false
+  changed_files_summary: false
+  sequence_diagrams: false
+  collapse_walkthrough: true
+  poem: false
+  review_status: false
+  in_progress_fortune: false
+  estimate_code_review_effort: false
+  # Solo repo: nobody to suggest.
+  suggested_reviewers: false
+  auto_review:
+    enabled: true
+    drafts: false
+    # Never stop reviewing long-running PRs.
+    auto_pause_after_reviewed_commits: 0
+  suggested_labels: true
+  # Mirrors the taxonomy in CLAUDE.md; suggestions only, applied by hand.
+  labeling_instructions:
+    - label: "type::bug"
+      instructions: "Something works differently than intended or documented."
+    - label: "type::feature"
+      instructions: "New capability or change in behavior."
+    - label: "type::maintenance"
+      instructions: >-
+        Deps, CI, tooling, refactors, tech debt. No user-visible change.
+    - label: "type::docs"
+      instructions: "Documentation only."
+    - label: "security"
+      instructions: >-
+        Touches a trust boundary, secret handling, or a vulnerability.
+    - label: "breaking change"
+      instructions: "Requires user action on upgrade."
+  path_instructions:
+    - path: "**/*.py"
+      instructions: >-
+        House convention: every function and method defined in this repo
+        takes keyword-only arguments (a bare * before the first
+        parameter), and calls pass arguments by keyword unless the
+        parameter is positional-only. Flag violations of either.
+        Also flag speculative generality: abstractions with a single
+        implementation, configuration for values that never change, and
+        indirection serving a future not present in the diff. Prefer
+        deletion over addition and the standard library over new
+        dependencies.
+  # Error-mode checks are the enforcement layer; path_instructions above
+  # are advisory, so the two house rules are duplicated here as gates.
+  pre_merge_checks:
+    docstrings:
+      # Docstrings are deliberately optional here (ruff D1 is ignored).
+      mode: "off"
+    title:
+      mode: "error"
+      requirements: >-
+        Imperative mood, under 72 characters, conventional-commit style
+        prefix (feat:, fix:, ci:, docs:, chore:, refactor:, test:).
+    description:
+      mode: "error"
+    custom_checks:
+      - name: "No speculative generality"
+        mode: "error"
+        instructions: >-
+          Fail if the diff adds an abstraction with a single
+          implementation, configuration for a value that never changes,
+          or indirection that serves no caller in this diff.
+      - name: "Keyword-only convention"
+        mode: "error"
+        instructions: >-
+          Fail if a Python function or method defined in this diff lacks
+          a bare * before its first parameter, or a call site passes a
+          non-positional-only argument positionally.
+  finishing_touches:
+    # Generated docstrings would only narrate the obvious.
+    docstrings:
+      enabled: false
+    unit_tests:
+      enabled: false
+    simplify:
+      enabled: true
+  tools:
+    # Ruff and zizmor run locally via prek with full rule sets; repeating
+    # them in review comments is noise.
+    ruff:
+      enabled: false
+    zizmor:
+      enabled: false
+
+chat:
+  art: false
+  auto_reply: true
