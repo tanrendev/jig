@@ -73,7 +73,8 @@ reviews:
       mode: "error"
       requirements: >-
         Imperative mood, under 72 characters, conventional-commit style
-        prefix (feat:, fix:, ci:, docs:, chore:, refactor:, test:).
+        prefix (feat:, fix:, ci:, docs:, chore:, refactor:, test:),
+        with the conventional breaking-change marker allowed (feat!:).
     description:
       mode: "error"
     custom_checks:
