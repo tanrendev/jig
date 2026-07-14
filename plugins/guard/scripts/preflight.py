@@ -17,7 +17,7 @@ import os
 import re
 from pathlib import Path
 
-from safechain import shims_path
+from safechain import scan_path_prefix, shims_path
 
 MATCH = {"hook_event_name": "SessionStart"}
 
@@ -47,7 +47,7 @@ def wire_path() -> None:
     shims = shims_path()
     if not env_file or not shims.is_dir():
         return
-    line = f'export PATH="{shims}:$PATH"'
+    line = f'export PATH="{scan_path_prefix()}:$PATH"'
     path = Path(env_file)
     try:
         if line in (path.read_text() if path.exists() else ""):
