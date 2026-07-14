@@ -4,9 +4,9 @@
   "description": "Guardrail hooks for Claude Code.",
   "plugins": [
     {
-      "name": "guard",
-      "source": "./plugins/guard",
-      "description": "Supply-chain guard for agent-driven package installs: routes them through the Aikido safe-chain malware scan and blocks installs that cannot be scanned.",
+      "name": "jig",
+      "source": "./plugins/jig",
+      "description": "Guardrail hooks for Claude Code. Currently guard: routes agent-driven package installs through the Aikido safe-chain malware scan and blocks installs that cannot be scanned.",
       "category": "security"
     }
   ]
