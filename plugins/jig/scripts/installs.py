@@ -1,0 +1,47 @@
+"""Deny agent package installs that cannot be scanned for malware.
+
+Interactive shells sit behind whatever supply-chain tooling the user set
+up, but agent-spawned `bash -c` shells inherit none of it, so the agent
+could fetch a typosquatted package the user's own shell would have
+refused. Guard fails closed: until a scanner is integrated (#8), every
+explicit install is denied, with JIG_GUARD_ALLOW_UNSCANNED=1 as the
+escape for users who accept unscanned installs.
+"""
+
+import os
+import re
+
+MATCH = {"hook_event_name": "PreToolUse", "tool_name": "Bash"}
+
+# Explicit package-fetching commands, including run-on-demand fetchers
+# (npx, uvx, pipx run) that install without ever saying "install".
+INSTALLS = re.compile(
+    r"""\b(?:
+        (?:npm|pnpm|yarn|bun)\s+(?:-{1,2}\S+\s+)*(?:install|i|ci|add|update|upgrade|up)\b
+      | (?:npx|pnpx|bunx|uvx)\s
+      | pip3?\s+(?:-{1,2}\S+\s+)*install\b
+      | python3?\s+-m\s+pip\s+install\b
+      | uv\s+(?:add|sync)\b
+      | uv\s+pip\s+install\b
+      | uv\s+tool\s+(?:install|run)\b
+      | poetry\s+(?:add|install|update)\b
+      | pipx\s+(?:install|run)\b
+      | pdm\s+(?:add|install|update)\b
+    )""",
+    re.VERBOSE,
+)
+
+DENY = (
+    "Package install blocked: no malware scanner is integrated, so this "
+    "install cannot be scanned for known-malicious packages. Set "
+    "JIG_GUARD_ALLOW_UNSCANNED=1 to permit unscanned installs."
+)
+
+
+def run(*, event: dict) -> dict | None:
+    command = (event.get("tool_input") or {}).get("command")
+    if not isinstance(command, str) or not INSTALLS.search(command):
+        return None
+    if os.environ.get("JIG_GUARD_ALLOW_UNSCANNED"):
+        return None
+    return {"permissionDecision": "deny", "permissionDecisionReason": DENY}

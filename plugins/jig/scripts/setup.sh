@@ -14,15 +14,8 @@ UV_VERSION="0.11.28"
 # Pre-release: matches the repo toolchain (requires-python >=3.15); move
 # to 3.15.0 final when it lands (Oct 2026).
 PYTHON_VERSION="3.15.0b3"
-SAFECHAIN_VERSION="1.5.12"
 
-with_safechain=0
-for arg in "$@"; do
-  case "$arg" in
-    --with-safechain) with_safechain=1 ;;
-    *) echo "setup: unknown option: $arg" >&2; exit 2 ;;
-  esac
-done
+[ $# -eq 0 ] || { echo "setup: unknown option: $1" >&2; exit 2; }
 
 JIG_HOME="${JIG_HOME:-$HOME/.local/share/jig}"
 mkdir -p "$JIG_HOME/bin"
@@ -56,20 +49,10 @@ print('jig runtime ok:', sys.version.split()[0], 'at', sys.executable)"
 # plugin update ships and nudges a setup.sh re-run when they diverge.
 printf '%s\n' "$PYTHON_VERSION" >"$JIG_HOME/.python-pin"
 
-# safe-chain is the scanner guard routes installs through. Opt-in via
-# --with-safechain, driven by the /jig:setup skill so the user sees and
-# approves this third-party install. Its --ci mode writes PATH shims to
-# ~/.safe-chain/shims, which the SessionStart hook prepends onto PATH.
-if [ "$with_safechain" = 1 ]; then
-  if [ -d "$HOME/.safe-chain/shims" ]; then
-    echo "safe-chain already installed (~/.safe-chain/shims)."
-  else
-    echo "Installing Aikido safe-chain $SAFECHAIN_VERSION (--ci PATH shims)..."
-    # Version-pinned. safe-chain's installer verifies the binary it fetches
-    # against an embedded checksum; what stays unverified is the installer
-    # script itself (fetched over TLS from the pinned release URL). Pin its
-    # SHA256 before wider distribution.
-    curl -fsSL "https://github.com/AikidoSec/safe-chain/releases/download/$SAFECHAIN_VERSION/install-safe-chain.sh" \
-      | sh -s -- --ci
-  fi
+# Earlier versions installed Aikido safe-chain as the install scanner
+# (removed in #7, replacement tracked in #8). Point at the leftover but
+# never delete it: the directory may predate jig.
+if [ -d "$HOME/.safe-chain" ]; then
+  echo "Note: jig no longer uses Aikido safe-chain. If /jig:setup installed it,"
+  echo "remove the leftover with: rm -rf ~/.safe-chain (keep it if you installed it yourself)."
 fi

@@ -2,10 +2,11 @@
 
 Plugin marketplace for Claude Code. One plugin:
 
-- **guard**: PreToolUse guardrails. Today: routes agent-driven package
-  installs through the Aikido safe-chain malware scan and blocks installs
-  that can't be scanned. Next: deny-list for destructive shell commands
-  (rm -rf on roots and globs, force pushes, hard resets).
+- **guard**: PreToolUse guardrails. Today: blocks agent-driven package
+  installs that can't be scanned for malware; the scanner integration is
+  being swapped ([#8](https://github.com/tanrendev/jig/issues/8)). Next:
+  deny-list for destructive shell commands (rm -rf on roots and globs,
+  force pushes, hard resets).
 
 ## Install
 
