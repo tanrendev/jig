@@ -31,12 +31,12 @@ def run_guard(
     command: str | None = None,
     args: tuple[str, ...] = (),
     event: dict | None = None,
-    allow_unscanned: bool = False,
+    allow_unscanned: str | None = None,
     jig_home: str | Path = "/nonexistent",
 ) -> dict | None:
     env = base_env(jig_home=jig_home)
-    if allow_unscanned:
-        env["JIG_GUARD_ALLOW_UNSCANNED"] = "1"
+    if allow_unscanned is not None:
+        env["JIG_GUARD_ALLOW_UNSCANNED"] = allow_unscanned
     if event is None:
         event = {"hook_event_name": "PreToolUse", "tool_name": "Bash", "tool_input": {"command": command}}
     proc = subprocess.run(
@@ -74,7 +74,17 @@ def test_non_install_commands_pass(*, command: str) -> None:
     assert run_guard(command=command) is None
 
 
-@pytest.mark.parametrize("command", ["npm install left-pad", "pip install requests", "uvx ruff check"])
+@pytest.mark.parametrize(
+    "command",
+    [
+        "npm install left-pad",
+        "pip install requests",
+        "uvx ruff check",
+        # Versioned interpreters must not slip past the regex.
+        "pip3.11 install requests",
+        "python3.12 -m pip install requests",
+    ],
+)
 def test_install_denied_with_escape_pointer(*, command: str) -> None:
     out = run_guard(command=command)
     assert out["permissionDecision"] == "deny"
@@ -82,7 +92,12 @@ def test_install_denied_with_escape_pointer(*, command: str) -> None:
 
 
 def test_optout_allows_unscanned_install() -> None:
-    assert run_guard(command="pip install requests", allow_unscanned=True) is None
+    assert run_guard(command="pip install requests", allow_unscanned="1") is None
+
+
+@pytest.mark.parametrize("value", ["0", "false", "yes"])
+def test_optout_requires_the_documented_value(*, value: str) -> None:
+    assert run_guard(command="pip install requests", allow_unscanned=value) is not None
 
 
 def test_non_matching_event_skips_enforcement() -> None:

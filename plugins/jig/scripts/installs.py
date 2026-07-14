@@ -19,8 +19,8 @@ INSTALLS = re.compile(
     r"""\b(?:
         (?:npm|pnpm|yarn|bun)\s+(?:-{1,2}\S+\s+)*(?:install|i|ci|add|update|upgrade|up)\b
       | (?:npx|pnpx|bunx|uvx)\s
-      | pip3?\s+(?:-{1,2}\S+\s+)*install\b
-      | python3?\s+-m\s+pip\s+install\b
+      | pip(?:3(?:\.\d+)?)?\s+(?:-{1,2}\S+\s+)*install\b
+      | python(?:3(?:\.\d+)?)?\s+-m\s+pip\s+(?:-{1,2}\S+\s+)*install\b
       | uv\s+(?:add|sync)\b
       | uv\s+pip\s+install\b
       | uv\s+tool\s+(?:install|run)\b
@@ -42,6 +42,8 @@ def run(*, event: dict) -> dict | None:
     command = (event.get("tool_input") or {}).get("command")
     if not isinstance(command, str) or not INSTALLS.search(command):
         return None
-    if os.environ.get("JIG_GUARD_ALLOW_UNSCANNED"):
+    # Exactly "1": a fail-closed guard must not be switched off by a value
+    # (0, false) that reads as an attempt to switch it on.
+    if os.environ.get("JIG_GUARD_ALLOW_UNSCANNED") == "1":
         return None
     return {"permissionDecision": "deny", "permissionDecisionReason": DENY}
