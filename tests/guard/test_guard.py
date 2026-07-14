@@ -97,11 +97,12 @@ def test_non_install_commands_pass(*, shims: Path, command: str) -> None:
 def test_install_denied_with_shimmed_rerun_line(*, shims: Path) -> None:
     out = run_guard(shims_dir=shims, command="npm install left-pad")
     assert out["permissionDecision"] == "deny"
-    assert f'export PATH="{shims}:$PATH"; npm install left-pad' in out["permissionDecisionReason"]
+    rerun = f'export PATH="{shims}:{shims.parent / "bin"}:$PATH"; npm install left-pad'
+    assert rerun in out["permissionDecisionReason"]
 
 
 def test_reissued_command_passes(*, shims: Path) -> None:
-    command = f'export PATH="{shims}:$PATH"; npm install left-pad'
+    command = f'export PATH="{shims}:{shims.parent / "bin"}:$PATH"; npm install left-pad'
     assert run_guard(shims_dir=shims, command=command) is None
 
 
@@ -181,7 +182,33 @@ def test_preflight_combines_runtime_and_safechain_warnings(*, missing: Path, sta
 def test_pathwire_prepends_shims_to_env_file(*, shims: Path, tmp_path: Path) -> None:
     env_file = tmp_path / "session-env.sh"
     run_guard(shims_dir=shims, args=("preflight",), event=SESSION_EVENT, env_file=env_file)
-    assert env_file.read_text().strip() == f'export PATH="{shims}:$PATH"'
+    assert env_file.read_text().strip() == f'export PATH="{shims}:{shims.parent / "bin"}:$PATH"'
+
+
+def test_wired_path_resolves_scanner_binary(*, shims: Path, tmp_path: Path) -> None:
+    # Regression for #1: the shim wrapper resolves the scanner with
+    # `command -v safe-chain`, and the binary lives in the bin dir next to
+    # the shims. Wiring only the shims dir made the wrapper fail open.
+    bin_dir = shims.parent / "bin"
+    bin_dir.mkdir()
+    scanner = bin_dir / "safe-chain"
+    scanner.write_text(data="#!/bin/sh\n")
+    scanner.chmod(mode=0o755)
+    env_file = tmp_path / "session-env.sh"
+    run_guard(shims_dir=shims, args=("preflight",), event=SESSION_EVENT, env_file=env_file)
+    proc = subprocess.run(
+        args=["/bin/sh", "-c", f'. "{env_file}"; command -v safe-chain'],
+        capture_output=True,
+        text=True,
+        env={"PATH": "/usr/bin:/bin"},
+        check=False,
+    )
+    assert proc.returncode == 0, "scanner binary not resolvable from the wired PATH"
+
+
+def test_reissue_line_carries_scanner_bin_dir(*, shims: Path) -> None:
+    out = run_guard(shims_dir=shims, command="npm install left-pad")
+    assert str(shims.parent / "bin") in out["permissionDecisionReason"]
 
 
 def test_pathwire_silent_without_env_file(*, shims: Path) -> None:
@@ -210,7 +237,7 @@ def test_pathwire_runs_even_when_preflight_warns(*, shims: Path, stamped_home: P
     env_file = tmp_path / "session-env.sh"
     out = run_guard(shims_dir=shims, args=("preflight",), event=SESSION_EVENT, jig_home=stamped_home, env_file=env_file)
     assert "re-run" in out["additionalContext"]
-    assert f'export PATH="{shims}:$PATH"' in env_file.read_text()
+    assert f'export PATH="{shims}:{shims.parent / "bin"}:$PATH"' in env_file.read_text()
 
 
 def test_direct_tool_selection(*, missing: Path) -> None:

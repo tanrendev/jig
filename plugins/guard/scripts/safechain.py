@@ -55,6 +55,14 @@ def shims_path() -> Path:
     return Path(os.environ.get("JIG_GUARD_SHIMS_DIR") or Path.home() / ".safe-chain" / "shims")
 
 
+def scan_path_prefix() -> str:
+    # The shims locate the scanner with `command -v safe-chain`, and the
+    # binary lives in the bin dir next to the shims, which nothing else puts
+    # on PATH. Wiring only the shims made the wrappers fail open (#1).
+    shims = shims_path()
+    return f"{shims}:{shims.parent / 'bin'}"
+
+
 def run(*, event: dict) -> dict | None:
     command = (event.get("tool_input") or {}).get("command")
     if not isinstance(command, str) or not INSTALLS.search(command):
@@ -68,7 +76,7 @@ def run(*, event: dict) -> dict | None:
             "permissionDecisionReason": (
                 "Installs must run through the Aikido safe-chain malware "
                 "scan. Re-run this exact command: "
-                f'export PATH="{shims}:$PATH"; {command}'
+                f'export PATH="{scan_path_prefix()}:$PATH"; {command}'
             ),
         }
     if os.environ.get("JIG_GUARD_ALLOW_UNSCANNED"):
