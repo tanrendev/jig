@@ -1,5 +1,8 @@
 # jig
 
+Every commit gets the trailer
+`Co-Authored-By: Claude <noreply@anthropic.com>`.
+
 Always pass function arguments as keyword arguments, in Python code and in
 calls to Python APIs, unless the parameter is positional-only.
 
