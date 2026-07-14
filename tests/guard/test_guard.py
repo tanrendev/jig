@@ -192,12 +192,12 @@ def test_wired_path_resolves_scanner_binary(*, shims: Path, tmp_path: Path) -> N
     bin_dir = shims.parent / "bin"
     bin_dir.mkdir()
     scanner = bin_dir / "safe-chain"
-    scanner.write_text("#!/bin/sh\n")
-    scanner.chmod(0o755)
+    scanner.write_text(data="#!/bin/sh\n")
+    scanner.chmod(mode=0o755)
     env_file = tmp_path / "session-env.sh"
     run_guard(shims_dir=shims, args=("preflight",), event=SESSION_EVENT, env_file=env_file)
     proc = subprocess.run(
-        ["/bin/sh", "-c", f'. "{env_file}"; command -v safe-chain'],
+        args=["/bin/sh", "-c", f'. "{env_file}"; command -v safe-chain'],
         capture_output=True,
         text=True,
         env={"PATH": "/usr/bin:/bin"},
