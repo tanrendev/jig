@@ -52,6 +52,20 @@ reviews:
     - label: "breaking change"
       instructions: "Requires user action on upgrade."
   path_instructions:
+    # Review conduct for every file. With request_changes_workflow on and
+    # no human co-reviewer, an inflated or hedged finding blocks the merge
+    # until dismissed by hand, so these rules guard the gate itself.
+    - path: "**"
+      instructions: >-
+        Calibrate severity honestly: report a finding as critical or
+        major only after tracing it end to end; inflated severity is
+        worse than a missed nit. Never report a finding hedged on
+        something verifiable in this repository; check the callers,
+        config, or tests first and report only what survives. Do not
+        report the change the PR sets out to make as a finding: when the
+        title or description says behavior is removed or changed, review
+        the execution rather than the intent, unless the blast radius
+        clearly exceeds what the description acknowledges.
     - path: "**/*.py"
       instructions: >-
         House convention: every function and method defined in this repo
@@ -63,6 +77,16 @@ reviews:
         indirection serving a future not present in the diff. Prefer
         deletion over addition and the standard library over new
         dependencies.
+        Flag behavior added or changed in the diff that no test
+        exercises; test coverage is invisible to ruff and ty, so review
+        is the only place it gets checked.
+    - path: "tests/**"
+      instructions: >-
+        Flag tests that assert implementation details rather than
+        observable behavior, and tests whose intent is not clear from
+        the test name and body alone. Prefer plain pytest: no fixture
+        for what a local variable can do, no parametrize for a single
+        case.
   # Error-mode checks are the enforcement layer; path_instructions above
   # are advisory, so the two house rules are duplicated here as gates.
   pre_merge_checks:
