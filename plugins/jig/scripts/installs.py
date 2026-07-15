@@ -15,12 +15,16 @@ MATCH = {"hook_event_name": "PreToolUse", "tool_name": "Bash"}
 
 # Explicit package-fetching commands, including run-on-demand fetchers
 # (npx, uvx, pipx run) that install without ever saying "install".
+# An option before the subcommand may carry one value token (--index-url
+# URL); backtracking keeps the subcommand itself from being eaten as a
+# value, so `pip -q install` still matches.
+_OPTS = r"(?:-{1,2}\S+(?:\s+[^-\s]\S*)?\s+)*"
 INSTALLS = re.compile(
-    r"""\b(?:
-        (?:npm|pnpm|yarn|bun)\s+(?:-{1,2}\S+\s+)*(?:install|i|ci|add|update|upgrade|up)\b
+    rf"""\b(?:
+        (?:npm|pnpm|yarn|bun)\s+{_OPTS}(?:install|i|ci|add|update|upgrade|up)\b
       | (?:npx|pnpx|bunx|uvx)\s
-      | pip(?:3(?:\.\d+)?)?\s+(?:-{1,2}\S+\s+)*install\b
-      | python(?:3(?:\.\d+)?)?\s+-m\s+pip\s+(?:-{1,2}\S+\s+)*install\b
+      | pip(?:3(?:\.\d+)?)?\s+{_OPTS}install\b
+      | python(?:3(?:\.\d+)?)?\s+-m\s+pip\s+{_OPTS}install\b
       | uv\s+(?:add|sync)\b
       | uv\s+pip\s+install\b
       | uv\s+tool\s+(?:install|run)\b

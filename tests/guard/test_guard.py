@@ -83,6 +83,10 @@ def test_non_install_commands_pass(*, command: str) -> None:
         # Versioned interpreters must not slip past the regex.
         "pip3.11 install requests",
         "python3.12 -m pip install requests",
+        # Nor options whose value sits between the tool and the subcommand.
+        "pip --index-url https://example.invalid/simple install requests",
+        "python3.12 -m pip --proxy http://example.invalid install requests",
+        "npm --registry https://example.invalid install left-pad",
     ],
 )
 def test_install_denied_with_escape_pointer(*, command: str) -> None:
