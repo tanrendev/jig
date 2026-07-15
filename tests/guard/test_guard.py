@@ -131,16 +131,33 @@ def test_install_reissued_through_sfw(*, command: str, scanned_home: Path) -> No
     assert f'"{scanned_home}/bin/sfw" sh -c {shlex.quote(command)}' in out["permissionDecisionReason"]
 
 
-def test_reissued_command_passes(*, scanned_home: Path) -> None:
-    reissued = f"\"{scanned_home}/bin/sfw\" sh -c 'npm install left-pad'"
+@pytest.mark.parametrize("payload", ["npm install left-pad", "cd sub && npm install left-pad"])
+def test_reissued_command_passes(*, payload: str, scanned_home: Path) -> None:
+    reissued = f'"{scanned_home}/bin/sfw" sh -c {shlex.quote(payload)}'
     assert run_guard(command=reissued, jig_home=scanned_home) is None
 
 
 def test_midcommand_sfw_mention_is_not_routed(*, scanned_home: Path) -> None:
-    # Only a leading prefix counts as routed, or a crafted command could
-    # name the path and still install around the scan.
+    # The path must lead a reissue, not merely appear: a crafted command
+    # could name it and still install around the scan.
     command = f'echo "{scanned_home}/bin/sfw" && npm install left-pad'
     assert run_guard(command=command, jig_home=scanned_home) is not None
+
+
+@pytest.mark.parametrize(
+    "tail",
+    [
+        "sh -c ':'; npm install attacker",  # trailing command after a valid-looking wrapper
+        "--version; npm install attacker",  # not even the sh -c shape
+        "true && npm install attacker",
+    ],
+)
+def test_appended_command_after_sfw_is_denied(*, tail: str, scanned_home: Path) -> None:
+    # The routed check accepts only the exact reissue shape, so an install
+    # appended after the sfw invocation is not exempted from the scan.
+    command = f'"{scanned_home}/bin/sfw" {tail}'
+    out = run_guard(command=command, jig_home=scanned_home)
+    assert out["permissionDecision"] == "deny"
 
 
 def test_scanner_present_ignores_optout(*, scanned_home: Path) -> None:
@@ -166,7 +183,7 @@ def test_non_matching_event_skips_enforcement() -> None:
 
 
 RUNTIME_PIN = re.search(
-    r'^PYTHON_VERSION="([^"]+)"$', (PLUGIN_ROOT / "scripts" / "setup.sh").read_text(), re.MULTILINE
+    r'^PYTHON_VERSION="([^"]+)"$', (PLUGIN_ROOT / "scripts" / "setup.sh").read_text(), flags=re.MULTILINE
 ).group(1)
 
 

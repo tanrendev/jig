@@ -14,10 +14,16 @@ prompt, and updatedInput is silently ignored on PreToolUse anyway
 install; installs are rare.
 
 sfw wraps the command it is given with env vars (HTTPS_PROXY, PIP_CERT,
-CARGO_HTTP_PROXY, ...) that route package fetches through an ephemeral
+NODE_EXTRA_CA_CERTS, ...) that route package fetches through an ephemeral
 local proxy, which checks each fetch against Socket's feed and 403s
 confirmed malware. Spike notes with the observed behavior per command
 form and per outage shape: https://github.com/tanrendev/jig/issues/8
+
+The scan is defeatable by design. A reissued command that clears the
+injected environment (env -i, unset) fetches outside the proxy, the same
+ceiling safe-chain's PATH shims had. This raises the cost of a naive
+unscanned install; it is not a sandbox. Closing that gap needs egress
+control, which is out of scope here.
 """
 
 import os
@@ -46,7 +52,7 @@ INSTALLS = re.compile(
       | pipx\s+(?:install|run)\b
       | pdm\s+(?:add|install|update)\b
     )""",
-    re.VERBOSE,
+    flags=re.VERBOSE,
 )
 
 # The one guarded form that cannot complete behind the scan: poetry's
@@ -87,14 +93,28 @@ def reissue(*, sfw: Path, command: str) -> str:
     return f'"{sfw}" sh -c {shlex.quote(command)}'
 
 
+def is_routed(*, sfw: Path, command: str) -> bool:
+    # Accept only the exact reissue shape: sfw path, `sh`, `-c`, one
+    # payload token. A prefix test would exempt anything that merely
+    # starts with the (deterministic) sfw path, so `"$sfw" true; npm i
+    # evil` would run the install after the `;` outside the scan.
+    try:
+        tokens = shlex.split(command)
+    except ValueError:
+        return False  # unbalanced quotes: not a reissue we produced
+    match tokens:
+        case [path, "sh", "-c", _]:
+            return path == str(sfw)
+        case _:
+            return False
+
+
 def run(*, event: dict) -> dict | None:
     command = (event.get("tool_input") or {}).get("command")
     if not isinstance(command, str) or not INSTALLS.search(command):
         return None
     sfw = sfw_path()
-    # Anchored at the start: a mid-command mention of the path must not
-    # count as routed, or `true "$sfw"; npm i evil` would slip through.
-    if command.lstrip().startswith(f'"{sfw}" '):
+    if is_routed(sfw=sfw, command=command):
         return None
     if POETRY.search(command):
         reason = None if allow_unscanned() else DENY_POETRY

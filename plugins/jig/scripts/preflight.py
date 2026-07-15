@@ -13,7 +13,7 @@ from pathlib import Path
 
 MATCH = {"hook_event_name": "SessionStart"}
 
-PIN_LINE = re.compile(r'^PYTHON_VERSION="([^"]+)"$', re.MULTILINE)
+PIN_LINE = re.compile(r'^PYTHON_VERSION="([^"]+)"$', flags=re.MULTILINE)
 
 
 def jig_home() -> Path:
