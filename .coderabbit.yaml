@@ -86,8 +86,10 @@ reviews:
         test change against it. In particular: the test sits in the
         right tier, hook tests execute command strings parsed from
         hooks.json rather than re-typed copies, every test is hermetic
-        (nothing outside tmp_path is read or written), and unit tests
-        use no mocks, fakes, or monkeypatching.
+        (writes stay inside tmp_path and no mutable host state such as
+        the real HOME or ~/.local/share/jig is read; read-only access
+        to the working tree is expected), and unit tests use no mocks,
+        fakes, or monkeypatching.
         Flag tests that assert implementation details rather than
         observable behavior, and tests whose intent is not clear from
         the test name and body alone. Prefer plain pytest: no fixture

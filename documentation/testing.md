@@ -68,8 +68,11 @@ An autouse fixture gives every test a hermetic environment:
 - Everything else is scrubbed from the environment; a test declares any extra
   variable it needs.
 
-A test that reads or writes the real `~/.local/share/jig`, or anything else
-outside its `tmp_path`, is a bug in the test, whatever it asserts.
+Hermetic means isolated from mutable host state, and no more than that.
+Read-only access to the working tree (the plugin directory, `hooks.json`) is
+expected; the verbatim rule depends on it. A test that writes outside its
+`tmp_path`, or reads mutable host state such as the real `HOME` or the real
+`~/.local/share/jig`, is a bug in the test, whatever it asserts.
 
 ### Payload fixtures
 
