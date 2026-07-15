@@ -9,6 +9,9 @@ calls to Python APIs, unless the parameter is positional-only.
 Declare function signatures keyword-only: a bare `*` before the first
 parameter of every function and method we define.
 
+Before writing or changing any test, read `documentation/testing.md` and
+follow it. It only applies to test code; skip it for everything else.
+
 ## Labels
 
 Labels apply to issues and PRs alike. Every issue and PR gets exactly one
