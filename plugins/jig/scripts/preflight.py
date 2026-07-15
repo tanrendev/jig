@@ -1,61 +1,23 @@
-"""Session-start setup and drift report for guard.
+"""Session-start drift report for guard.
 
-Two jobs at session start. First, wire the scanner shims onto PATH for
-every Bash call this session (wire_path): this is what makes scanning the
-default state, so the PreToolUse deny in safechain rarely has to fire.
-Second, report drift the wiring can't fix: safe-chain absent, or the
-provisioned runtime no longer matching the pin this plugin version ships.
-
-The SessionStart wrapper in hooks.json verifies the managed runtime before
-this runs (a Python tool cannot report its own interpreter missing).
-Enforcement in safechain.py re-checks its own facts per call regardless:
-session state drifts, and additionalContext advises the model, it gates
-nothing.
+Reports what per-call enforcement cannot see: the provisioned runtime no
+longer matching the pin this plugin version ships. The SessionStart
+wrapper in hooks.json verifies the managed runtime before this runs (a
+Python tool cannot report its own interpreter missing). additionalContext
+advises the model, it gates nothing.
 """
 
 import os
 import re
 from pathlib import Path
 
-from safechain import scan_path_prefix, shims_path
-
 MATCH = {"hook_event_name": "SessionStart"}
 
 PIN_LINE = re.compile(r'^PYTHON_VERSION="([^"]+)"$', re.MULTILINE)
 
-SAFECHAIN_WARNING = (
-    "guard: Aikido safe-chain is not installed on this machine, so "
-    "agent-driven package installs will be denied rather than run "
-    "unscanned. If installs are likely this session, tell the user they can "
-    "run /jig:setup to install it, or set JIG_GUARD_ALLOW_UNSCANNED=1 to "
-    "accept unscanned installs."
-)
-
 
 def jig_home() -> Path:
     return Path(os.environ.get("JIG_HOME") or Path.home() / ".local" / "share" / "jig")
-
-
-def wire_path() -> None:
-    # CLAUDE_ENV_FILE is sourced (with $PATH expansion) before every Bash
-    # command this session, the documented way to shape the tool shell's
-    # environment. Prepending the shims makes npm/pip resolve through the
-    # scanner transparently, covering transitive and lockfile installs the
-    # command-string deny can't see. Claude Code only; silent if unset or
-    # the scanner isn't installed.
-    env_file = os.environ.get("CLAUDE_ENV_FILE")
-    shims = shims_path()
-    if not env_file or not shims.is_dir():
-        return
-    line = f'export PATH="{scan_path_prefix()}:$PATH"'
-    path = Path(env_file)
-    try:
-        if line in (path.read_text() if path.exists() else ""):
-            return
-        with path.open("a") as f:
-            f.write(line + "\n")
-    except OSError:
-        return  # can't write the env file; safechain's per-call deny is the fallback
 
 
 def runtime_warning() -> str | None:
@@ -75,18 +37,6 @@ def runtime_warning() -> str | None:
     )
 
 
-def safechain_warning() -> str | None:
-    if os.environ.get("JIG_GUARD_ALLOW_UNSCANNED"):
-        return None  # the user opted out; don't nag every session
-    shims = shims_path()
-    if shims.is_dir() or str(shims) in os.environ.get("PATH", ""):
-        return None
-    return SAFECHAIN_WARNING
-
-
 def run(*, event: dict) -> dict | None:  # noqa: ARG001  uniform tool contract
-    wire_path()
-    warnings = [w for w in (runtime_warning(), safechain_warning()) if w]
-    if not warnings:
-        return None
-    return {"additionalContext": "\n\n".join(warnings)}
+    warning = runtime_warning()
+    return {"additionalContext": warning} if warning else None

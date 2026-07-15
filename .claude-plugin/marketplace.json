@@ -6,7 +6,7 @@
     {
       "name": "jig",
       "source": "./plugins/jig",
-      "description": "Guardrail hooks for Claude Code. Currently guard: routes agent-driven package installs through the Aikido safe-chain malware scan and blocks installs that cannot be scanned.",
+      "description": "Guardrail hooks for Claude Code. Currently guard: blocks agent-driven package installs that cannot be scanned for malware.",
       "category": "security"
     }
   ]

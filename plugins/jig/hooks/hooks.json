@@ -1,5 +1,5 @@
 {
-  "description": "guard: SessionStart provisions the managed runtime, wires scanner shims onto PATH, and reports drift; PreToolUse blocks package installs that cannot be scanned.",
+  "description": "guard: SessionStart provisions the managed runtime and reports drift; PreToolUse blocks package installs that cannot be scanned.",
   "hooks": {
     "SessionStart": [
       {
