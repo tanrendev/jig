@@ -1,7 +1,8 @@
-"""Guard plugin: dispatch, installs and preflight tools, hooks.json shell wrappers."""
+"""Guard plugin: dispatch, sfw and preflight tools, hooks.json shell wrappers."""
 
 import json
 import re
+import shlex
 import subprocess
 import sys
 from pathlib import Path
@@ -69,6 +70,15 @@ def run_wrapper(
     return json.loads(out)["hookSpecificOutput"] if out else None
 
 
+@pytest.fixture
+def scanned_home(*, tmp_path: Path) -> Path:
+    # A JIG_HOME whose sfw binary exists, so installs get reissued.
+    home = tmp_path / "jig"
+    (home / "bin").mkdir(parents=True)
+    (home / "bin" / "sfw").write_text("#!/bin/sh\nexit 0\n")
+    return home
+
+
 @pytest.mark.parametrize("command", ["git status", "npm test", "uv run pytest"])
 def test_non_install_commands_pass(*, command: str) -> None:
     assert run_guard(command=command) is None
@@ -89,10 +99,11 @@ def test_non_install_commands_pass(*, command: str) -> None:
         "npm --registry https://example.invalid install left-pad",
     ],
 )
-def test_install_denied_with_escape_pointer(*, command: str) -> None:
+def test_install_denied_when_scanner_missing(*, command: str) -> None:
     out = run_guard(command=command)
     assert out["permissionDecision"] == "deny"
     assert "JIG_GUARD_ALLOW_UNSCANNED" in out["permissionDecisionReason"]
+    assert "/jig:setup" in out["permissionDecisionReason"]
 
 
 def test_optout_allows_unscanned_install() -> None:
@@ -102,6 +113,51 @@ def test_optout_allows_unscanned_install() -> None:
 @pytest.mark.parametrize("value", ["0", "false", "yes"])
 def test_optout_requires_the_documented_value(*, value: str) -> None:
     assert run_guard(command="pip install requests", allow_unscanned=value) is not None
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        "npm install left-pad",
+        "cd sub && npm install left-pad --ignore-scripts",
+        "uvx ruff check",
+    ],
+)
+def test_install_reissued_through_sfw(*, command: str, scanned_home: Path) -> None:
+    out = run_guard(command=command, jig_home=scanned_home)
+    assert out["permissionDecision"] == "deny"
+    # The reissue must be the whole command behind sh -c: a bare prefix
+    # would guard only the first word of a compound command.
+    assert f'"{scanned_home}/bin/sfw" sh -c {shlex.quote(command)}' in out["permissionDecisionReason"]
+
+
+def test_reissued_command_passes(*, scanned_home: Path) -> None:
+    reissued = f"\"{scanned_home}/bin/sfw\" sh -c 'npm install left-pad'"
+    assert run_guard(command=reissued, jig_home=scanned_home) is None
+
+
+def test_midcommand_sfw_mention_is_not_routed(*, scanned_home: Path) -> None:
+    # Only a leading prefix counts as routed, or a crafted command could
+    # name the path and still install around the scan.
+    command = f'echo "{scanned_home}/bin/sfw" && npm install left-pad'
+    assert run_guard(command=command, jig_home=scanned_home) is not None
+
+
+def test_scanner_present_ignores_optout(*, scanned_home: Path) -> None:
+    # The escape covers what cannot be scanned; a working scanner still scans.
+    assert run_guard(command="npm install left-pad", allow_unscanned="1", jig_home=scanned_home) is not None
+
+
+@pytest.mark.parametrize("command", ["poetry add requests", "poetry install", "poetry update"])
+def test_poetry_denied_without_reissue(*, command: str, scanned_home: Path) -> None:
+    out = run_guard(command=command, jig_home=scanned_home)
+    assert out["permissionDecision"] == "deny"
+    assert "poetry" in out["permissionDecisionReason"]
+    assert "sh -c" not in out["permissionDecisionReason"]
+
+
+def test_poetry_optout_allows(*, scanned_home: Path) -> None:
+    assert run_guard(command="poetry add requests", allow_unscanned="1", jig_home=scanned_home) is None
 
 
 def test_non_matching_event_skips_enforcement() -> None:
@@ -116,19 +172,16 @@ RUNTIME_PIN = re.search(
 
 @pytest.fixture
 def stamped_home(*, tmp_path: Path) -> Path:
+    # A JIG_HOME with scanner and stamp in place, so runtime drift is what varies.
     home = tmp_path / "home"
-    home.mkdir()
+    (home / "bin").mkdir(parents=True)
+    (home / "bin" / "sfw").write_text("#!/bin/sh\nexit 0\n")
     (home / ".python-pin").write_text(f"{RUNTIME_PIN}\n")
     return home
 
 
 def test_preflight_silent_when_stamp_matches_pin(*, stamped_home: Path) -> None:
     assert run_guard(args=("preflight",), event=SESSION_EVENT, jig_home=stamped_home) is None
-
-
-def test_preflight_silent_when_unprovisioned() -> None:
-    # No stamp to compare; the SessionStart wrapper covers missing runtimes.
-    assert run_guard(args=("preflight",), event=SESSION_EVENT) is None
 
 
 def test_preflight_nudges_setup_rerun_on_stale_runtime(*, stamped_home: Path) -> None:
@@ -139,13 +192,34 @@ def test_preflight_nudges_setup_rerun_on_stale_runtime(*, stamped_home: Path) ->
     assert out["hookEventName"] == "SessionStart"
 
 
+def test_preflight_warns_when_scanner_missing(*, stamped_home: Path) -> None:
+    (stamped_home / "bin" / "sfw").unlink()
+    out = run_guard(args=("preflight",), event=SESSION_EVENT, jig_home=stamped_home)
+    assert "sfw" in out["additionalContext"]
+    assert "/jig:setup" in out["additionalContext"]
+    assert "re-run" not in out["additionalContext"]  # runtime is fine, only the scanner nags
+
+
+def test_preflight_scanner_warning_respects_optout(*, stamped_home: Path) -> None:
+    (stamped_home / "bin" / "sfw").unlink()
+    assert run_guard(args=("preflight",), event=SESSION_EVENT, jig_home=stamped_home, allow_unscanned="1") is None
+
+
+def test_preflight_reports_runtime_and_scanner_together(*, stamped_home: Path) -> None:
+    (stamped_home / ".python-pin").write_text("0.0.0\n")
+    (stamped_home / "bin" / "sfw").unlink()
+    out = run_guard(args=("preflight",), event=SESSION_EVENT, jig_home=stamped_home)
+    assert "re-run" in out["additionalContext"]
+    assert "sfw" in out["additionalContext"]
+
+
 def test_event_routing_reaches_preflight_without_arg(*, stamped_home: Path) -> None:
     (stamped_home / ".python-pin").write_text("0.0.0\n")
     assert run_guard(event=SESSION_EVENT, jig_home=stamped_home) is not None
 
 
 def test_direct_tool_selection() -> None:
-    assert run_guard(command="pip install requests", args=("installs",)) is not None
+    assert run_guard(command="pip install requests", args=("sfw",)) is not None
 
 
 def test_unknown_tool_fails() -> None:
@@ -177,7 +251,7 @@ def write_setup(plugin_root: Path, *, body: str) -> None:
 def fake_plugin(*, tmp_path: Path) -> Path:
     root = tmp_path / "plugin"
     (root / "scripts").mkdir(parents=True)
-    for mod in ("guard.py", "installs.py", "preflight.py"):
+    for mod in ("guard.py", "sfw.py", "preflight.py"):
         (root / "scripts" / mod).symlink_to(PLUGIN_ROOT / "scripts" / mod)
     return root
 
@@ -195,7 +269,10 @@ def test_session_wrapper_provisions_missing_runtime(*, fake_plugin: Path, tmp_pa
     write_setup(fake_plugin, body=PROVISION_OK)
     out = run_wrapper(command=SESSION_CMD, jig_home=jig, event=SESSION_EVENT, plugin_root=fake_plugin)
     assert (jig / "bin" / "python3").exists()  # wrapper ran setup.sh
-    assert out is None  # then execed preflight: fresh stamp matches the pin, no drift
+    # Fresh stamp matches the pin, so the only preflight note is the
+    # scanner one: the test setup.sh provisions no sfw.
+    assert "sfw" in out["additionalContext"]
+    assert "re-run" not in out["additionalContext"]
 
 
 def test_session_wrapper_reports_when_provisioning_fails(*, fake_plugin: Path, tmp_path: Path) -> None:

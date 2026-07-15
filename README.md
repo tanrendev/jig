@@ -2,9 +2,9 @@
 
 Plugin marketplace for Claude Code. One plugin:
 
-- **guard**: PreToolUse guardrails. Today: blocks agent-driven package
-  installs that can't be scanned for malware; the scanner integration is
-  being swapped ([#8](https://github.com/tanrendev/jig/issues/8)). Next:
+- **guard**: PreToolUse guardrails. Today: routes agent-driven package
+  installs through the [Socket Firewall free](https://github.com/SocketDev/sfw-free)
+  malware scan and blocks installs that can't be scanned. Next:
   deny-list for destructive shell commands (rm -rf on roots and globs,
   force pushes, hard resets).
 
@@ -15,16 +15,21 @@ Plugin marketplace for Claude Code. One plugin:
 /plugin install guard@jig
 ```
 
-The hooks run on a jig-managed Python runtime. Provision it once
-(and re-run after a version-pin bump) from the installed plugin directory:
+The hooks run on a jig-managed Python runtime. Provision it, plus the
+Socket Firewall scanner guard reissues installs through, with `/jig:setup`
+(which discloses what the scanner phones home before installing), or from
+the installed plugin directory:
 
 ```
-sh scripts/setup.sh
+sh scripts/setup.sh --with-sfw
 ```
 
-This pins uv and CPython under `~/.local/share/jig` (override with
-`JIG_HOME`); nothing else on the machine is read or modified. Until it runs,
-guard stays inactive and prints a notice instead of blocking anything.
+Without the flag, setup provisions only the runtime. Everything lands
+under `~/.local/share/jig` (override with `JIG_HOME`), pinned by version
+and checksum; nothing else on the machine is read or modified. Until the
+runtime exists, guard stays inactive and prints a notice instead of
+blocking anything. Without the scanner, guard denies agent-driven
+installs as unscannable (`JIG_GUARD_ALLOW_UNSCANNED=1` opts out).
 
 ## Repository layout
 

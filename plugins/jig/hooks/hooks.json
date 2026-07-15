@@ -1,5 +1,5 @@
 {
-  "description": "guard: SessionStart provisions the managed runtime and reports drift; PreToolUse blocks package installs that cannot be scanned.",
+  "description": "guard: SessionStart provisions the managed runtime and reports drift; PreToolUse routes package installs through the Socket Firewall malware scan and blocks what cannot be scanned.",
   "hooks": {
     "SessionStart": [
       {
