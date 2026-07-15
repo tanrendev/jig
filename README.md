@@ -31,4 +31,5 @@ guard stays inactive and prints a notice instead of blocking anything.
 ```
 .claude-plugin/marketplace.json    catalog read by Claude Code
 plugins/<name>/                    one directory per plugin
+documentation/                     contributor docs; testing.md is the test strategy
 ```
