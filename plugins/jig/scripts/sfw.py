@@ -94,17 +94,19 @@ def reissue(*, sfw: Path, command: str) -> str:
 
 
 def is_routed(*, sfw: Path, command: str) -> bool:
-    # Accept only the exact reissue shape: sfw path, `sh`, `-c`, one
-    # payload token. A prefix test would exempt anything that merely
-    # starts with the (deterministic) sfw path, so `"$sfw" true; npm i
-    # evil` would run the install after the `;` outside the scan.
+    # Exempt only the byte-exact string reissue() emits, not merely the
+    # token shape. The canonical payload is single-quoted, so it reaches
+    # sfw inert; a hand-built wrapper whose payload the outer shell would
+    # expand first (a double-quoted "$(...)" or backticks) fails this
+    # round-trip and is denied, keeping that install from running before
+    # the scan. A non-canonical wrapper falls through to a fresh reissue.
     try:
         tokens = shlex.split(command)
     except ValueError:
         return False  # unbalanced quotes: not a reissue we produced
     match tokens:
-        case [path, "sh", "-c", _]:
-            return path == str(sfw)
+        case [path, "sh", "-c", payload] if path == str(sfw):
+            return command == reissue(sfw=sfw, command=payload)
         case _:
             return False
 
@@ -114,10 +116,13 @@ def run(*, event: dict) -> dict | None:
     if not isinstance(command, str) or not INSTALLS.search(command):
         return None
     sfw = sfw_path()
-    if is_routed(sfw=sfw, command=command):
-        return None
+    # Poetry before the routed exemption: poetry cannot complete behind the
+    # scan, so a hand-wrapped `sfw sh -c 'poetry ...'` must stay deny-only
+    # rather than be waved through as routed.
     if POETRY.search(command):
         reason = None if allow_unscanned() else DENY_POETRY
+    elif is_routed(sfw=sfw, command=command):
+        return None
     elif not sfw.is_file():
         reason = None if allow_unscanned() else DENY_MISSING
     else:

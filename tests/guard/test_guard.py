@@ -150,14 +150,25 @@ def test_midcommand_sfw_mention_is_not_routed(*, scanned_home: Path) -> None:
         "sh -c ':'; npm install attacker",  # trailing command after a valid-looking wrapper
         "--version; npm install attacker",  # not even the sh -c shape
         "true && npm install attacker",
+        'sh -c "$(npm install attacker)"',  # $(...) the outer shell expands before sfw runs
+        "sh -c `npm install attacker`",  # backtick substitution, same escape
     ],
 )
-def test_appended_command_after_sfw_is_denied(*, tail: str, scanned_home: Path) -> None:
-    # The routed check accepts only the exact reissue shape, so an install
-    # appended after the sfw invocation is not exempted from the scan.
+def test_non_canonical_wrapper_is_denied(*, tail: str, scanned_home: Path) -> None:
+    # is_routed exempts only the byte-exact reissue() output, so appended
+    # commands and payloads the outer shell would expand first are denied.
     command = f'"{scanned_home}/bin/sfw" {tail}'
     out = run_guard(command=command, jig_home=scanned_home)
     assert out["permissionDecision"] == "deny"
+
+
+def test_wrapped_poetry_stays_deny_only(*, scanned_home: Path) -> None:
+    # A hand-wrapped poetry command must not get the routed exemption:
+    # poetry cannot install behind the scan, so it stays deny-only.
+    command = f'"{scanned_home}/bin/sfw" sh -c {shlex.quote("poetry install")}'
+    out = run_guard(command=command, jig_home=scanned_home)
+    assert out["permissionDecision"] == "deny"
+    assert "poetry" in out["permissionDecisionReason"]
 
 
 def test_scanner_present_ignores_optout(*, scanned_home: Path) -> None:
