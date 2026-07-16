@@ -77,6 +77,7 @@ ignore = [
     "S603",     # subprocess with inputs the tests themselves construct.
     "PLR0913",  # helpers mirror the hook env knobs; the count is the point.
     "PLR2004",  # expected exit codes and counts are literal in tests.
+    "ARG001",   # fixtures requested for their side effects look unused.
 ]
 "plugins/*/scripts/*.py" = [
     "INP001",  # hook scripts are standalone files on sys.path, not a package.
@@ -84,6 +85,7 @@ ignore = [
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+filterwarnings = ["error"]
 
 [tool.ruff.lint.pydocstyle]
 convention = "pep257"
