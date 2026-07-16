@@ -37,7 +37,10 @@ Work down this list and stop at the first match:
    version matches)? Tier 2.
 3. Is it a pure function with an input space too large to enumerate readably
    at the process boundary? Tier 3.
-4. Does it need the network or a real Claude Code session? Tier 4.
+
+Behavior that only shows over the network or inside a real Claude Code
+session (cold provisioning, live host drift) is out of scope for this
+suite: the cost of running it outweighs what it would catch at this size.
 
 If a candidate test needs mocks or filesystem fakes, it is misplaced in
 tier 3; move it up to tier 1.
@@ -141,23 +144,11 @@ Rules:
   classification logic extracted into pure functions. That is the single
   demand the strategy makes of code structure.
 
-## Tier 4: gated end-to-end
-
-Two kinds of expensive tests, excluded from the per-PR loop:
-
-- Cold provisioning over the real network: the setup script run against an
-  empty `JIG_HOME`, asserting the managed runtime lands and that a second run
-  is an idempotent no-op. Marked `network`.
-- Host drift smoke: the full suite on a weekly CI schedule, optionally plus
-  one headless `claude` run against a scratch project confirming the hooks
-  fire end to end. Claude Code is a moving dependency this repo cannot pin;
-  a weekly run finds breakage before users do.
-
 ## Suite-wide policy
 
 - `filterwarnings = ["error"]`: every warning fails the suite.
-- The default run is offline; `network`-marked tests run only when selected
-  explicitly.
+- The suite is offline. A test that needs the network has no tier to live
+  in and does not get written.
 - No coverage gate. At this size a percentage invites gaming; the tier 1 case
   matrix is the coverage policy. Revisit if the plugin count grows.
 - Plain pytest, zero plugins. Add `pytest-xdist` when the suite crosses
@@ -173,9 +164,8 @@ Two kinds of expensive tests, excluded from the per-PR loop:
 
 ## CI
 
-- Per PR: tiers 1 through 3, once under dash and once under bash. Lint and
-  typing stay in their existing jobs.
-- Weekly schedule: the full suite including tier 4.
+Per PR: the whole suite, once under dash and once under bash. Lint and
+typing stay in their existing jobs.
 
 ## Deliberately not used
 
@@ -186,6 +176,9 @@ Two kinds of expensive tests, excluded from the per-PR loop:
 - Mocking frameworks: excluded by the tier rules above.
 - tox and nox: uv already owns environments.
 - Coverage tooling: no gate, so no infrastructure.
+- Network-dependent end-to-end tests (cold provisioning against the real
+  installers, headless `claude` runs): dropped as not worth their cost at
+  the current size. Revisit if a provisioning regression ever ships.
 - A shared test-helper module: extract a helper when two files duplicate it,
   and only what they duplicate.
 
@@ -200,11 +193,6 @@ Flask, FastAPI, pandas, and requests. What was borrowed:
 - Testing at the boundary users actually hit: FastAPI, which runs its
   documentation examples as the test suite.
 - Regression rows citing issue numbers: requests and pandas.
-- Expensive tests gated out of the default loop: Django (label-gated CI
-  jobs) and pandas (markers plus scheduled runs).
-- Scheduled runs against unpinned moving dependencies: FastAPI and pandas
-  run crons against upstream nightlies; here the moving dependency is Claude
-  Code itself.
 - No coverage gate: three of the five enforce none, and the exception
   (FastAPI) gates at exactly 100 percent. Nothing in between exists in that
   population, which reads as a verdict on intermediate thresholds.
