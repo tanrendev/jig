@@ -1,10 +1,10 @@
 """Session-start drift report for guard.
 
 Reports what per-call enforcement cannot see: the provisioned runtime no
-longer matching the pin this plugin version ships. The SessionStart
-wrapper in hooks.json verifies the managed runtime before this runs (a
-Python tool cannot report its own interpreter missing). additionalContext
-advises the model, it gates nothing.
+longer matching the pin this plugin version ships, or the install scanner
+missing. The SessionStart wrapper in hooks.json verifies the managed
+runtime before this runs (a Python tool cannot report its own interpreter
+missing). additionalContext advises the model, it gates nothing.
 """
 
 import os
@@ -13,11 +13,23 @@ from pathlib import Path
 
 MATCH = {"hook_event_name": "SessionStart"}
 
-PIN_LINE = re.compile(r'^PYTHON_VERSION="([^"]+)"$', re.MULTILINE)
+PIN_LINE = re.compile(r'^PYTHON_VERSION="([^"]+)"$', flags=re.MULTILINE)
 
 
 def jig_home() -> Path:
     return Path(os.environ.get("JIG_HOME") or Path.home() / ".local" / "share" / "jig")
+
+
+def scanner_warning() -> str | None:
+    if os.environ.get("JIG_GUARD_ALLOW_UNSCANNED") == "1":
+        return None  # the user accepts unscanned installs; nothing to nag about
+    if (jig_home() / "bin" / "sfw").is_file():
+        return None
+    return (
+        "guard: Socket Firewall (sfw) is not installed, so agent package "
+        "installs will be denied as unscannable. Tell the user to run "
+        "/jig:setup to install it."
+    )
 
 
 def runtime_warning() -> str | None:
@@ -38,5 +50,5 @@ def runtime_warning() -> str | None:
 
 
 def run(*, event: dict) -> dict | None:  # noqa: ARG001  uniform tool contract
-    warning = runtime_warning()
-    return {"additionalContext": warning} if warning else None
+    warnings = [w for w in (runtime_warning(), scanner_warning()) if w]
+    return {"additionalContext": " ".join(warnings)} if warnings else None

@@ -24,13 +24,13 @@ import json
 import sys
 from typing import TYPE_CHECKING
 
-import installs
 import preflight
+import sfw
 
 if TYPE_CHECKING:
     from types import ModuleType
 
-TOOLS = {"installs": installs, "preflight": preflight}
+TOOLS = {"preflight": preflight, "sfw": sfw}
 
 
 def matches(*, tool: ModuleType, event: dict) -> bool:
