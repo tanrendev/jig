@@ -37,14 +37,14 @@ reviews:
   suggested_labels: true
   # Mirrors the taxonomy in CLAUDE.md; suggestions only, applied by hand.
   labeling_instructions:
-    - label: "type::bug"
+    - label: "bug"
       instructions: "Something works differently than intended or documented."
-    - label: "type::feature"
+    - label: "feature"
       instructions: "New capability or change in behavior."
-    - label: "type::maintenance"
+    - label: "maintenance"
       instructions: >-
         Deps, CI, tooling, refactors, tech debt. No user-visible change.
-    - label: "type::docs"
+    - label: "docs"
       instructions: "Documentation only."
     - label: "security"
       instructions: >-
