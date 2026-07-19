@@ -7,6 +7,12 @@ Plugin marketplace for Claude Code. One plugin:
   malware scan and blocks installs that can't be scanned. Next:
   deny-list for destructive shell commands (rm -rf on roots and globs,
   force pushes, hard resets).
+- **skills**: an idea-to-ship engineering flow (grill an idea sharp,
+  spec it, split it into tracer-bullet tickets, implement with TDD,
+  review on two axes), on-ramps for triage, hard bugs, and foggy
+  multi-session efforts, plus productivity skills. Largely vendored
+  from [mattpocock/skills](https://github.com/mattpocock/skills); see
+  Third-party below.
 
 ## Install
 
@@ -18,7 +24,8 @@ Plugin marketplace for Claude Code. One plugin:
 The hooks run on a jig-managed Python runtime. Provision it, plus the
 Socket Firewall scanner guard reissues installs through, with `/jig:setup`
 (which discloses what the scanner phones home before installing), or from
-the installed plugin directory:
+the installed plugin directory. `/jig:setup` also configures the current
+repo for the skills: issue tracker, triage labels, domain doc layout.
 
 ```
 sh scripts/setup.sh --with-sfw

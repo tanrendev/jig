@@ -1,12 +1,12 @@
 {
   "name": "jig",
   "owner": { "name": "tanren", "email": "hello@tanren.dev" },
-  "description": "Guardrail hooks for Claude Code.",
+  "description": "Guardrail hooks and engineering skills for Claude Code.",
   "plugins": [
     {
       "name": "jig",
       "source": "./plugins/jig",
-      "description": "Guardrail hooks for Claude Code. Currently guard: blocks agent-driven package installs that cannot be scanned for malware.",
+      "description": "Guardrail hooks and engineering skills for Claude Code. guard blocks agent-driven package installs that cannot be scanned for malware; the skills cover an idea-to-ship flow (grilling, specs, tickets, TDD, review, triage).",
       "category": "security"
     }
   ]
