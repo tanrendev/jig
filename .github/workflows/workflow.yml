@@ -12,6 +12,7 @@ jobs:
   test:
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         # The hooks.json command strings run under whatever /bin/sh the
         # user's machine has; dash is the Debian-family answer.
