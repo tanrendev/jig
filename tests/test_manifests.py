@@ -78,6 +78,55 @@ def test_hook_timeouts_declared() -> None:
                 assert hook["timeout"] > 0
 
 
+SKILL_MANIFESTS = sorted((PLUGIN_ROOT / "skills").glob("*/*/SKILL.md"))
+BUCKETS = sorted(p for p in (PLUGIN_ROOT / "skills").iterdir() if p.is_dir())
+
+
+def _skill_frontmatter(*, path: Path) -> dict[str, str]:
+    # The host reads a flat key: value block between --- fences; parsing
+    # anything richer here would accept skills the host rejects.
+    text = path.read_text()
+    assert text.startswith("---\n"), path
+    block, fence, _ = text.removeprefix("---\n").partition("\n---\n")
+    assert fence, path
+    fields = {}
+    for line in block.splitlines():
+        key, sep, value = line.partition(":")
+        assert sep, line
+        fields[key.strip()] = value.strip().strip('"')
+    return fields
+
+
+@pytest.mark.parametrize("path", SKILL_MANIFESTS, ids=lambda p: p.parent.name)
+def test_skill_frontmatter_names_and_describes_itself(*, path: Path) -> None:
+    fields = _skill_frontmatter(path=path)
+    # The folder is the identity the host loads the skill under.
+    assert fields["name"] == path.parent.name
+    # Descriptions sit in context every turn and truncate past the cap.
+    assert 0 < len(fields["description"]) <= 1024
+
+
+@pytest.mark.parametrize("path", SKILL_MANIFESTS, ids=lambda p: p.parent.name)
+def test_skill_relative_links_resolve(*, path: Path) -> None:
+    # Skills disclose reference material through relative links; a
+    # dangling one ships a skill pointing at nothing. Fenced blocks and
+    # code spans are exempt: their links are examples addressed to the
+    # repo the skill operates on, not files of this plugin.
+    prose = re.sub(r"```.*?```|`[^`]*`", "", path.read_text(), flags=re.DOTALL)
+    for target in re.findall(r"\]\((?!https?://)([^)#]+)", prose):
+        assert (path.parent / target).is_file(), target
+
+
+@pytest.mark.parametrize("bucket", BUCKETS, ids=lambda p: p.name)
+def test_bucket_readme_lists_exactly_its_skills(*, bucket: Path) -> None:
+    # Each bucket README indexes its skills by relative link; adding or
+    # removing a skill without touching the index desyncs them silently.
+    readme = (bucket / "README.md").read_text()
+    listed = set(re.findall(r"\]\(\./([^/)]+)/SKILL\.md\)", readme))
+    present = {p.name for p in bucket.iterdir() if p.is_dir()}
+    assert listed == present
+
+
 def test_plugin_version_matches_pyproject() -> None:
     # The commitizen bump rewrites both; a mismatch means a release from
     # a half-synced tree.
