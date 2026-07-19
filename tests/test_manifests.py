@@ -53,6 +53,17 @@ def test_hook_commands_reference_existing_files() -> None:
                     assert target.is_file(), ref
 
 
+def test_command_plugin_root_references_resolve() -> None:
+    # Commands name their support files (setup templates) the same way
+    # hooks.json names its scripts; a dangling reference ships a command
+    # that cannot find them.
+    for command in (PLUGIN_ROOT / "commands").glob("*.md"):
+        for ref in re.findall(r"\$\{CLAUDE_PLUGIN_ROOT\}([^\"\s`]+)", command.read_text()):
+            target = (PLUGIN_ROOT / ref.lstrip("/")).resolve()
+            assert target.is_relative_to(PLUGIN_ROOT), ref
+            assert target.exists(), ref
+
+
 def test_hook_events_are_host_defined() -> None:
     assert set(json.loads(HOOKS.read_text())["hooks"]) <= EVENTS
 
